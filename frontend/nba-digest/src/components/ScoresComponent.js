@@ -10,7 +10,7 @@ function ScoresComponent() {
         setScores(response.data); // Set fetched data to state
       })
       .catch(error => {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching data from api/score:', error);
       });
   }, []);
 
