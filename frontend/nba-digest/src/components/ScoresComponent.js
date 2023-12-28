@@ -5,7 +5,7 @@ function ScoresComponent() {
   const [scores, setScores] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:3000/api/scores') // Fetch data from backend endpoint
+    axios.get('http://127.0.0.1:5000/api/scores') // Fetch data from backend endpoint
       .then(response => {
         setScores(response.data); // Set fetched data to state
       })
