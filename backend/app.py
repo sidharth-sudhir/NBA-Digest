@@ -1,13 +1,16 @@
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import requests
+import os
 from threading import Thread
 
 app = Flask(__name__)
 
 # Configure SQLAlchemy for database
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://sidharth:test1234@postgresql-nbadigest.cdki2q40wzrd.us-east-2.rds.amazonaws.com/postgres'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('AWSURL')
 db = SQLAlchemy(app)
+
+rapid_api_key = os.environ.get('RAPID_API_KEY')
 
 class NBAScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -20,10 +23,11 @@ with app.app_context():
 def fetch_and_store_scores():
     url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-04"
     headers = {
-        "X-RapidAPI-Key": "7c48c44c7bmsh74113a13314eae4p1506dajsn07eab21d6002",
+        "X-RapidAPI-Key": rapid_api_key,
         "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"
     }
 
+    print(rapid_api_key)
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
