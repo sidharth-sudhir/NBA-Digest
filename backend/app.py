@@ -9,8 +9,6 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('AWSURL')
 db = SQLAlchemy(app)
 
-rapid_api_key = os.environ.get('RAPID_API_KEY')
-
 class NBAScore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     data = db.Column(db.JSON)
@@ -22,11 +20,10 @@ with app.app_context():
 def fetch_and_store_scores():
     url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-04"
     headers = {
-        "X-RapidAPI-Key": rapid_api_key,
+        "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
         "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"
     }
 
-    print(rapid_api_key)
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
