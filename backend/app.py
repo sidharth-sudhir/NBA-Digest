@@ -6,7 +6,6 @@ from threading import Thread
 
 app = Flask(__name__)
 
-# Configure SQLAlchemy for database
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('AWSURL')
 db = SQLAlchemy(app)
 
@@ -31,21 +30,15 @@ def fetch_and_store_scores():
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
-        print("Got code 200")
         fetched_scores = response.json()
-        # print(fetched_scores)
         new_nba_score = NBAScore(data=fetched_scores)
-        print("We got here")
-        print(app.config['SQLALCHEMY_DATABASE_URI'])
         
         try:
             with app.app_context():
-                print("In app_context")
                 db.session.add(new_nba_score)
                 db.session.commit()
             return 'Scores fetched and stored successfully'
         except Exception as e:
-            print(f"Failed to store scores: {str(e)}")
             db.session.rollback()  # Rollback changes on exception
             return 'Failed to fetch NBA scores'
     else:
