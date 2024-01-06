@@ -6,6 +6,7 @@ import os
 from threading import Thread
 from datetime import datetime
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 
 
 app = Flask(__name__)
@@ -19,7 +20,9 @@ class Game(db.Model):
     awayTeamID = db.Column(db.Integer, db.ForeignKey('team.id'))  # Define ForeignKey for awayTeamID
     home_team = db.relationship("Team", foreign_keys=[homeTeamID], backref="home_games")  # Define relationship for home_team
     away_team = db.relationship("Team", foreign_keys=[awayTeamID], backref="away_games")  # Define relationship for away_team
-
+    home_team_score = db.Column(db.Integer)
+    away_team_score = db.Column(db.Integer)
+    game_date = db.Column(db.Date)
 
 class Player(db.Model):
     playerId = db.Column(db.Integer, primary_key=True)
@@ -50,26 +53,29 @@ def populate_teams():
 
         if response.status_code == 200:
             fetched_teams = response.json()["response"]
+            teams_to_insert = []
+
+            for team in fetched_teams:
+                existing_team = Team.query.filter_by(id=team['id']).first()
+                if not existing_team:
+                    new_team = Team(
+                        id = team['id'],
+                        name = team['name'],
+                        code = team["code"],
+                        logo = team["logo"],
+                        city = team["city"],
+                        nickname = team["nickname"]
+                    )
+                    teams_to_insert.append(new_team)
+
             try:
-                for team in fetched_teams:
-                    try:
-                        existing_team = Team.query.filter_by(id=team['id']).first()
-                        if not existing_team:
-                            new_team = Team(
-                                id=team['id'],
-                                name=team['name'],
-                                code=team["code"],
-                                logo=team["logo"],
-                                city=team["city"],
-                                nickname=team["nickname"]
-                            )
-                            db.session.add(new_team)
-                    except Exception as e:
-                        db.session.rollback()
-                        return f'Failed to store NBA Teams in Database: {str(e)}'
-                db.session.commit()
-                return 'Teams fetched and stored successfully'
-            except Exception as e:
+                if teams_to_insert:
+                    db.session.bulk_save_objects(teams_to_insert)
+                    db.session.commit()
+                    return 'Teams fetched and stored successfully'
+                else:
+                    return 'No new teams to store'
+            except IntegrityError as e:
                 db.session.rollback()
                 return f'Failed to store NBA Teams in Database: {str(e)}'
         else:
@@ -87,20 +93,30 @@ def fetch_and_store_scores():
 
     if response.status_code == 200:
         fetched_scores = response.json()["response"]
+        games_to_insert = []
+
+        for game in fetched_scores:
+            new_game_entry = Game(
+                gameId = game["id"],
+                homeTeamID = game["teams"]["home"]["id"],
+                awayTeamID = game["teams"]["visitors"]["id"],
+                game_date = datetime.strptime(game["date"]["start"], "%Y-%m-%dT%H:%M:%S.%fZ"),
+                home_team_score = game["scores"]["home"]["points"],
+                away_team_score = game["scores"]["visitors"]["points"]
+            )
+            games_to_insert.append(new_game_entry)
+
         try:
             with app.app_context():
-                for game in fetched_scores:
-                    new_game_entry = Game(
-                        gameId = game["id"],
-                        homeTeamID = game["teams"]["home"]["id"],
-                        awayTeamID = game["teams"]["visitors"]["id"]
-                    )
-                    db.session.add(new_game_entry)
-                db.session.commit()
-            return 'Scores fetched and stored successfully'
-        except Exception as e:
+                if games_to_insert:
+                    db.session.bulk_save_objects(games_to_insert)
+                    db.session.commit()
+                    return 'Scores fetched and stored successfully'
+                else:
+                    return 'No new scores to store'
+        except IntegrityError as e:
             db.session.rollback()
-            return 'Failed to store NBA Scores in Database'
+            return f'Failed to store NBA Scores in Database: {str(e)}'
     else:
         return 'Failed to fetch NBA scores from RAPID API'
     
@@ -114,8 +130,8 @@ def get_nba_scores():
             home_team = game.home_team
             away_team = game.away_team
             scores.append({
-                'home team': home_team.name,
-                'away team': away_team.name,
+                'HOME': home_team.name,
+                'AWAY': away_team.name
             })
         return jsonify(scores)
     else:
