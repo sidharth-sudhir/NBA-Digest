@@ -1,5 +1,7 @@
 # NBA Digest
 
+*WIP
+
 ## Overview
 
 NBA Digest is a sleek and user-friendly web application designed to provide an intuitive overview of the NBA landscape. It's your go-to platform for easily accessing box scores, standings, playoff insights, fan polls, MVP trackers, and insightful NBA props.
