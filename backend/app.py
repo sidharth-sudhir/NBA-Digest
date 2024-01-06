@@ -5,6 +5,8 @@ import requests
 import os
 from threading import Thread
 from datetime import datetime
+from sqlalchemy.orm import joinedload
+
 
 app = Flask(__name__)
 
@@ -36,7 +38,6 @@ class Team(db.Model):
 with app.app_context():
     db.create_all()
 
-@app.route('/populate_teams')
 def populate_teams():
     with app.app_context():
         url = "https://api-nba-v1.p.rapidapi.com/teams"
@@ -105,16 +106,22 @@ def fetch_and_store_scores():
     
 @app.route('/get-nba-scores')
 def get_nba_scores():
-    latest_game_results = Game.query.order_by(Game.id.desc()).limit(100).all()
+    latest_game_results = Game.query.options(joinedload(Game.home_team), joinedload(Game.away_team)).order_by(Game.gameId.desc()).limit(100).all()
+    
     if latest_game_results:
         scores = []
-        for _ in latest_game_results:
+        for game in latest_game_results:
+            home_team = game.home_team
+            away_team = game.away_team
             scores.append({
-                'test': 'This is a test value foo!'
+                'home team': home_team.name,
+                'away team': away_team.name,
             })
         return jsonify(scores)
     else:
         return jsonify([])
 
+
 if __name__ == '__main__':
+    populate_teams()
     app.run(debug=True)
