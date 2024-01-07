@@ -104,8 +104,8 @@ def fetch_and_store_scores():
         existing_games = {}
         for game in fetched_scores:
             existing_game = Game.query.filter_by(gameId=game["id"]).first()
-            if existing_game:
-                # If the game exists, update its details
+            if existing_game and existing_game.game_status != '3':
+                # If the game exists and was not finished, update its details
                 existing_games[game["id"]] = existing_game
 
         # Update existing games
