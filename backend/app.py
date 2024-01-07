@@ -7,6 +7,7 @@ from threading import Thread
 from datetime import datetime
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 
 
 app = Flask(__name__)
@@ -23,6 +24,7 @@ class Game(db.Model):
     home_team_score = db.Column(db.Integer)
     away_team_score = db.Column(db.Integer)
     game_date = db.Column(db.Date)
+    game_status = db.Column(db.Integer)
 
 class Player(db.Model):
     playerId = db.Column(db.Integer, primary_key=True)
@@ -43,6 +45,11 @@ with app.app_context():
 
 def populate_teams():
     with app.app_context():
+        team_count = db.session.query(func.count(Team.id)).scalar()
+
+        if team_count > 0:
+            return 'Team table is already populated'
+
         url = "https://api-nba-v1.p.rapidapi.com/teams"
         headers = {
             "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
@@ -59,12 +66,12 @@ def populate_teams():
                 existing_team = Team.query.filter_by(id=team['id']).first()
                 if not existing_team:
                     new_team = Team(
-                        id = team['id'],
-                        name = team['name'],
-                        code = team["code"],
-                        logo = team["logo"],
-                        city = team["city"],
-                        nickname = team["nickname"]
+                        id=team['id'],
+                        name=team['name'],
+                        code=team["code"],
+                        logo=team["logo"],
+                        city=team["city"],
+                        nickname=team["nickname"]
                     )
                     teams_to_insert.append(new_team)
 
@@ -83,7 +90,7 @@ def populate_teams():
 
 @app.route('/fetch-nba-scores')
 def fetch_and_store_scores():
-    url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-06"
+    url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-07"
     headers = {
         "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
         "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"
@@ -93,49 +100,86 @@ def fetch_and_store_scores():
 
     if response.status_code == 200:
         fetched_scores = response.json()["response"]
-        games_to_insert = []
-
+        # Collect existing games to update
+        existing_games = {}
         for game in fetched_scores:
-            new_game_entry = Game(
-                gameId = game["id"],
-                homeTeamID = game["teams"]["home"]["id"],
-                awayTeamID = game["teams"]["visitors"]["id"],
-                game_date = datetime.strptime(game["date"]["start"], "%Y-%m-%dT%H:%M:%S.%fZ"),
-                home_team_score = game["scores"]["home"]["points"],
-                away_team_score = game["scores"]["visitors"]["points"]
-            )
-            games_to_insert.append(new_game_entry)
+            existing_game = Game.query.filter_by(gameId=game["id"]).first()
+            if existing_game:
+                # If the game exists, update its details
+                existing_games[game["id"]] = existing_game
+
+        # Update existing games
+        for game_id, existing_game in existing_games.items():
+            # Find the corresponding fetched game by ID
+            fetched_game = next((g for g in fetched_scores if g["id"] == game_id), None)
+            if fetched_game:
+                existing_game.home_team_score = fetched_game["scores"]["home"]["points"]
+                existing_game.away_team_score = fetched_game["scores"]["visitors"]["points"]
+                existing_game.game_status = fetched_game["status"]["short"]
+
+        # Add new games to bulk save
+        new_games_to_insert = [
+            Game(
+                gameId=game["id"],
+                homeTeamID=game["teams"]["home"]["id"],
+                awayTeamID=game["teams"]["visitors"]["id"],
+                game_date=datetime.strptime(game["date"]["start"], "%Y-%m-%dT%H:%M:%S.%fZ"),
+                home_team_score=game["scores"]["home"]["points"],
+                away_team_score=game["scores"]["visitors"]["points"],
+                game_status=game["status"]["short"]
+            ) for game in fetched_scores if game["id"] not in existing_games
+        ]
 
         try:
-            with app.app_context():
-                if games_to_insert:
-                    db.session.bulk_save_objects(games_to_insert)
-                    db.session.commit()
-                    return 'Scores fetched and stored successfully'
-                else:
-                    return 'No new scores to store'
+            # Bulk save new games
+            if new_games_to_insert:
+                db.session.bulk_save_objects(new_games_to_insert)
+            db.session.commit()
+            return 'Scores fetched and stored successfully'
         except IntegrityError as e:
             db.session.rollback()
             return f'Failed to store NBA Scores in Database: {str(e)}'
+
     else:
         return 'Failed to fetch NBA scores from RAPID API'
     
-@app.route('/get-nba-scores')
-def get_nba_scores():
-    latest_game_results = Game.query.options(joinedload(Game.home_team), joinedload(Game.away_team)).order_by(Game.gameId.desc()).limit(100).all()
-    
-    if latest_game_results:
-        scores = []
-        for game in latest_game_results:
-            home_team = game.home_team
-            away_team = game.away_team
-            scores.append({
-                'HOME': home_team.name,
-                'AWAY': away_team.name
-            })
-        return jsonify(scores)
-    else:
-        return jsonify([])
+@app.route('/get-nba-scores/<date>')
+def get_nba_scores(date):
+    try:
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        games_on_date = Game.query \
+            .filter(Game.game_date == target_date) \
+            .options(joinedload(Game.home_team), joinedload(Game.away_team)) \
+            .order_by(Game.gameId.desc()) \
+            .limit(100) \
+            .all()
+        
+        if games_on_date:
+            scores = []
+            for game in games_on_date:
+                home_team = game.home_team
+                away_team = game.away_team
+                
+                game_data = {
+                    'HOME': home_team.name,
+                    'AWAY': away_team.name,
+                    'STATUS': 'Not Started' if game.game_status == 1 else ('Live' if game.game_status == 2 else 'Finished')
+                }
+
+                # Conditionally add scores if the game status is 2 or 3
+                if game.game_status in [2, 3]:
+                    game_data['HOME_SCORE'] = game.home_team_score
+                    game_data['AWAY_SCORE'] = game.away_team_score
+                
+                scores.append(game_data)
+
+            return jsonify(scores)
+        else:
+            return jsonify([])
+
+    except ValueError:
+        return 'Invalid date format. Please use YYYY-MM-DD.'
 
 
 if __name__ == '__main__':
