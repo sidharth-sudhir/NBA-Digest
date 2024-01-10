@@ -11,10 +11,13 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from extensions import db
+from routes import app as routes_blueprint
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('AWSURL')
 db.init_app(app)
+
+app.register_blueprint(routes_blueprint)
 
 with app.app_context():
     db.create_all()
