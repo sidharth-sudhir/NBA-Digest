@@ -4,14 +4,13 @@ from sqlalchemy import func
 from extensions import db
 from models import Player, Team
 
-
 def initialize_teams_and_players(app) -> bool:
     with app.app_context():
         team_count = db.session.query(func.count(Team.id)).scalar()
         player_count = db.session.query(func.count(Player.playerId)).scalar()
         
         if team_count > 0 and player_count > 0:
-            print('Team and Player tables are already populated')
+            print('✅✅✅ Team and Player tables are already populated ✅✅✅')
             return True
 
         if not team_count:
@@ -34,8 +33,6 @@ def initialize_teams_and_players(app) -> bool:
                 try:
                     if teams_to_insert:
                         db.session.bulk_save_objects(teams_to_insert)
-                    else:
-                        return True
                 except IntegrityError as e:
                     db.session.rollback()
                     print(f'Failed to store NBA Teams from JSON in Database: {str(e)}')
@@ -49,7 +46,7 @@ def initialize_teams_and_players(app) -> bool:
                 players_to_insert = []
                 added_player_ids = set()
 
-                for team_id, team_players in players_data.items():
+                for _, team_players in players_data.items():
                     for player_data in team_players:
                         if player_data['id'] in added_player_ids:
                             continue
@@ -65,8 +62,6 @@ def initialize_teams_and_players(app) -> bool:
                 try:
                     if players_to_insert:
                         db.session.bulk_save_objects(players_to_insert)
-                    else:
-                        return True
                 except IntegrityError as e:
                     db.session.rollback()
                     print(f'Failed to store NBA Players from JSON in Database: {str(e)}')
@@ -74,5 +69,5 @@ def initialize_teams_and_players(app) -> bool:
 
         # Commit changes only after processing both teams and players
         db.session.commit()
-        print('Teams and Players fetched and stored successfully from JSON')
+        print('✅✅✅ Teams and Players fetched and stored successfully from JSON ✅✅✅')
         return True
