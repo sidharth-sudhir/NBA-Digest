@@ -1,7 +1,4 @@
-import datetime
-import requests
 import os
-import json
 from initialize_db import initialize_teams_and_players
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy

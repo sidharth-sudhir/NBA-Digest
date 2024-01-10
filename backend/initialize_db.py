@@ -1,5 +1,4 @@
 import json
-from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
 from extensions import db
