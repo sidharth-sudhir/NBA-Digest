@@ -1,6 +1,6 @@
 from flask import Blueprint
-from fetch_api_data import fetch_and_store_scores
-from fetch_db_data import get_nba_scores
+from fetch.fetch_api_data import fetch_and_store_scores
+from fetch.fetch_db_data import get_nba_scores
 
 app = Blueprint('app', __name__)  
 
