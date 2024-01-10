@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-
+import json
 
 app = Flask(__name__)
 
@@ -26,8 +26,13 @@ class Game(db.Model):
     game_date = db.Column(db.Date)
     game_status = db.Column(db.Integer)
 
+
 class Player(db.Model):
     playerId = db.Column(db.Integer, primary_key=True)
+    firstName = db.Column(db.String(100))
+    lastName = db.Column(db.String(100))
+    height = db.Column(db.Float)
+    weight = db.Column(db.Float)
 
 class PlayerStatistics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,54 +48,79 @@ class Team(db.Model):
 with app.app_context():
     db.create_all()
 
-def populate_teams():
+def populate_teams_and_players():
     with app.app_context():
         team_count = db.session.query(func.count(Team.id)).scalar()
+        player_count = db.session.query(func.count(Player.playerId)).scalar()
+        
+        if team_count > 0 and player_count > 0:
+            return 'Team and Player tables are already populated'
 
-        if team_count > 0:
-            return 'Team table is already populated'
+        # Process teams
+        if not team_count:
+            db.session.query(Team).delete()
+            with open('teams.json', 'r') as teams_file:
+                teams_data = json.load(teams_file)
+                teams_to_insert = []
 
-        url = "https://api-nba-v1.p.rapidapi.com/teams"
-        headers = {
-            "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
-            "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            fetched_teams = response.json()["response"]
-            teams_to_insert = []
-
-            for team in fetched_teams:
-                existing_team = Team.query.filter_by(id=team['id']).first()
-                if not existing_team:
+                for team in teams_data:
                     new_team = Team(
-                        id=team['id'],
-                        name=team['name'],
-                        code=team["code"],
-                        logo=team["logo"],
-                        city=team["city"],
-                        nickname=team["nickname"]
+                        id = team['id'],
+                        name = team['name'],
+                        code = team["code"],
+                        logo = team["logo"],
+                        city = team["city"],
+                        nickname = team["nickname"]
                     )
                     teams_to_insert.append(new_team)
+                
+                try:
+                    if teams_to_insert:
+                        db.session.bulk_save_objects(teams_to_insert)
+                    else:
+                        return 'No new teams to store'
+                except IntegrityError as e:
+                    db.session.rollback()
+                    return f'Failed to store NBA Teams from JSON in Database: {str(e)}'
 
-            try:
-                if teams_to_insert:
-                    db.session.bulk_save_objects(teams_to_insert)
-                    db.session.commit()
-                    return 'Teams fetched and stored successfully'
-                else:
-                    return 'No new teams to store'
-            except IntegrityError as e:
-                db.session.rollback()
-                return f'Failed to store NBA Teams in Database: {str(e)}'
-        else:
-            return 'Failed to fetch NBA Teams from API'
+        # Process players
+        if not player_count:
+            db.session.query(Player).delete()
+            with open('players.json', 'r') as players_file:
+                players_data = json.load(players_file)
+                players_to_insert = []
+                added_player_ids = set()
+
+                for team_id, team_players in players_data.items():
+                    for player_data in team_players:
+                        if player_data['id'] in added_player_ids:
+                            continue
+                        new_player = Player(
+                            playerId = player_data['id'],
+                            firstName = player_data['firstname'],
+                            lastName = player_data['lastname'],
+                            weight = player_data['weight']['kilograms'],
+                            height = player_data['height']['meters']
+                        )
+                        players_to_insert.append(new_player)
+                        added_player_ids.add(player_data['id'])
+                try:
+                    if players_to_insert:
+                        db.session.bulk_save_objects(players_to_insert)
+                    else:
+                        return 'No new players to store'
+                except IntegrityError as e:
+                    db.session.rollback()
+                    return f'Failed to store NBA Players from JSON in Database: {str(e)}'
+
+        # Commit changes only after processing both teams and players
+        db.session.commit()
+        return 'Teams and Players fetched and stored successfully from JSON'
+
 
 @app.route('/fetch-nba-scores')
 def fetch_and_store_scores():
-    url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-07"
+    url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-08"
     headers = {
         "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
         "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"
@@ -183,5 +213,5 @@ def get_nba_scores(date):
 
 
 if __name__ == '__main__':
-    populate_teams()
+    populate_teams_and_players()
     app.run(debug=True)
