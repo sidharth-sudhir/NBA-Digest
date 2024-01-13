@@ -6,8 +6,10 @@ from models import Game  # Import your Game model here
 from extensions import db
 import os
 
-def fetch_and_store_scores():
-    url = "https://api-nba-v1.p.rapidapi.com/games?date=2024-01-10"
+def fetch_and_store_scores(date):
+    target_date = datetime.strptime(date, '%Y-%m-%d').date()
+
+    url = f"https://api-nba-v1.p.rapidapi.com/games?date={target_date}"
     headers = {
         "X-RapidAPI-Key": os.environ.get('RAPID_API_KEY'),
         "X-RapidAPI-Host": "api-nba-v1.p.rapidapi.com"

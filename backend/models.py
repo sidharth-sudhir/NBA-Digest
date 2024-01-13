@@ -11,7 +11,6 @@ class Game(db.Model):
     game_date = db.Column(db.Date)
     game_status = db.Column(db.Integer)
 
-
 class Player(db.Model):
     playerId = db.Column(db.Integer, primary_key=True)
     firstName = db.Column(db.String(100))
@@ -21,6 +20,14 @@ class Player(db.Model):
 
 class PlayerStatistics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    points = db.Column(db.Integer)
+    assists = db.Column(db.Integer)
+
+    # Define relationships with other models
+    player = db.relationship('Player', backref=db.backref('player_statistics', lazy=True))
+    game = db.relationship('Game', backref=db.backref('player_statistics', lazy=True))
 
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
