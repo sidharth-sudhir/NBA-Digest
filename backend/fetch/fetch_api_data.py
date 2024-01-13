@@ -60,8 +60,9 @@ def fetch_and_store_scores(date):
         
         for game in fetched_scores:
             fetch_and_store_player_stats(game["id"])
-
+            
         return 'Scores fetched and stored successfully'
+
 
     else:
         return 'Failed to fetch NBA scores from RAPID API'
