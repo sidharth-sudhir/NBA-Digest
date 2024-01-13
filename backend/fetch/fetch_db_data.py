@@ -1,7 +1,7 @@
 from flask import jsonify
 from datetime import datetime
 from sqlalchemy.orm import joinedload
-from models import Game 
+from models import Game, PlayerStatistics
 
 def get_nba_scores(date):
     try:
@@ -39,3 +39,26 @@ def get_nba_scores(date):
 
     except ValueError:
         return 'Invalid date format. Please use YYYY-MM-DD.'
+
+
+def get_player_stats(game_id):
+    player_stats = (
+        PlayerStatistics.query
+        .options(joinedload(PlayerStatistics.player))  # Eager loading of player data
+        .filter_by(game_id=game_id)
+        .all()
+    )
+
+    if player_stats:
+        stats = []
+        for player_stat in player_stats:
+            player_data = {
+                'NAME': f"{player_stat.player.firstName} {player_stat.player.lastName}",
+                'POINTS': player_stat.points,
+                'REBOUNDS': player_stat.rebounds,
+                'ASSISTS': player_stat.assists
+            }
+            stats.append(player_data)
+        return jsonify(stats)
+    else:
+        return jsonify([])
