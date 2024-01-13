@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
-from models import Game, PlayerStatistics  # Import your Game model here
+from models import Game, PlayerStatistics, Player  # Import your Game model here
 from extensions import db
 import os
 
@@ -63,7 +63,6 @@ def fetch_and_store_scores(date):
             
         return 'Scores fetched and stored successfully'
 
-
     else:
         return 'Failed to fetch NBA scores from RAPID API'
 
@@ -105,6 +104,12 @@ def fetch_and_store_player_stats(game_id):
                 existing_stat.blocks = fetched_stat["blocks"]
                 existing_stat.plusMinus = fetched_stat["plusMinus"]
                 existing_stat.minutes = fetched_stat["min"]
+            
+        all_player_ids = {player.playerId for player in Player.query.all()}
+
+        valid_player_ids = all_player_ids.intersection({stat["player"]["id"] for stat in player_stats_data})
+
+        valid_player_stats_data = [stat for stat in player_stats_data if stat["player"]["id"] in valid_player_ids]
         
         new_stats_to_insert = [
             PlayerStatistics(
@@ -123,7 +128,7 @@ def fetch_and_store_player_stats(game_id):
                 blocks = stat["blocks"],
                 plusMinus = stat["plusMinus"],
                 minutes = stat["min"]
-            ) for stat in player_stats_data if stat["player"]["id"] not in existing_stats
+            ) for stat in valid_player_stats_data if stat["player"]["id"] not in existing_stats
         ]
 
         

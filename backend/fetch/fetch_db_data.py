@@ -21,6 +21,7 @@ def get_nba_scores(date):
                 away_team = game.away_team
                 
                 game_data = {
+                    'ID': game.gameId,
                     'HOME': home_team.name,
                     'AWAY': away_team.name,
                     'STATUS': 'Not Started' if game.game_status == 1 else ('Live' if game.game_status == 2 else 'Finished')
