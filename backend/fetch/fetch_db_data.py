@@ -56,6 +56,7 @@ def get_player_stats(game_id):
             player_data = {
                 'NAME': f"{player_stat.player.firstName} {player_stat.player.lastName}",
                 'POINTS': player_stat.points,
+                'FGM/FGA': str(player_stat.fgm) + "/" + str(player_stat.fga),
                 'REBOUNDS': player_stat.rebounds,
                 'ASSISTS': player_stat.assists
             }
