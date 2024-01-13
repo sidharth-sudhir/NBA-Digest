@@ -20,8 +20,8 @@ class Player(db.Model):
 
 class PlayerStatistics(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    game_id = db.Column(db.Integer, db.ForeignKey('game.id'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.playerId'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.gameId'), nullable=False)
     points = db.Column(db.Integer)
     assists = db.Column(db.Integer)
     rebounds = db.Column(db.Integer)
